@@ -93,6 +93,13 @@ def _dict_to_event(raw: dict[str, Any], line_num: int) -> Event | None:
     if event_type == EventType.TOOL_RESULT and parent_event_id is None:
         parent_event_id = raw.get("tool_call_id")
 
+    # Event.metadata is documented as dict[str, Any]; consumers call .get() on
+    # it. JSON null (or a non-object) would otherwise be stored verbatim and
+    # crash those readers — same contract as token_usage above (issue #43).
+    metadata = raw.get("metadata", {})
+    if not isinstance(metadata, dict):
+        metadata = {}
+
     return Event(
         event_id=raw.get("event_id", raw.get("tool_call_id", f"ev-{line_num}")),
         event_type=event_type,
@@ -103,7 +110,7 @@ def _dict_to_event(raw: dict[str, Any], line_num: int) -> Event | None:
         token_usage=token_usage,
         parent_event_id=parent_event_id,
         turn_id=raw.get("turn_id"),
-        metadata=raw.get("metadata", {}),
+        metadata=metadata,
     )
 
 

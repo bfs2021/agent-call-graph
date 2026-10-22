@@ -1,7 +1,7 @@
 """Regression tests: a hostile or truncated record must not kill the session.
 
-Covers issues #19, #20, #33 and #34 -- all of them the same parser trusting a
-field it never validated, or decoding text with whatever the locale happens to
+Covers issues #19, #20, #33, #34 and #43 -- all of them the same parser trusting
+a field it never validated, or decoding text with whatever the locale happens to
 be.
 """
 
@@ -179,3 +179,60 @@ def test_non_object_token_usage_is_ignored_not_fatal(tmp_path):
         f.type == "budget_anomaly" for f in find_budget_anomalies(session)
     )
     assert all(isinstance(e.token_usage, dict | None) for e in session.events)
+
+
+def test_non_object_metadata_is_coerced_to_empty_dict(tmp_path):
+    # Event.metadata is a dict; JSON null or a non-object must become {} so
+    # consumers can safely call .get() (issue #43).
+    path = _write(
+        tmp_path,
+        "meta.jsonl",
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "type": "tool_call",
+                        "tool_name": "bash",
+                        "timestamp": 1.0,
+                        "metadata": None,
+                    }
+                ),
+                json.dumps(
+                    {
+                        "type": "tool_call",
+                        "tool_name": "bash",
+                        "timestamp": 2.0,
+                        "metadata": "oops",
+                    }
+                ),
+                json.dumps(
+                    {
+                        "type": "tool_call",
+                        "tool_name": "bash",
+                        "timestamp": 3.0,
+                        "metadata": ["x"],
+                    }
+                ),
+                json.dumps(
+                    {
+                        "type": "tool_call",
+                        "tool_name": "bash",
+                        "timestamp": 4.0,
+                        "metadata": {"ok": 1},
+                    }
+                ),
+            ]
+        )
+        + "\n",
+    )
+
+    session = parse_generic_jsonl(path)
+
+    assert len(session.events) == 4
+    assert all(isinstance(e.metadata, dict) for e in session.events)
+    assert session.events[0].metadata == {}
+    assert session.events[1].metadata == {}
+    assert session.events[2].metadata == {}
+    assert session.events[3].metadata == {"ok": 1}
+    assert session.events[0].metadata.get("x") is None
+
