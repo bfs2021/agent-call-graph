@@ -100,8 +100,13 @@ def _dict_to_event(raw: dict[str, Any], line_num: int) -> Event | None:
     if not isinstance(metadata, dict):
         metadata = {}
 
+    # Event.event_id is a str; JSON null must fall back like the fields above.
+    event_id = raw.get("event_id", raw.get("tool_call_id"))
+    if not isinstance(event_id, str):
+        event_id = f"ev-{line_num}"
+
     return Event(
-        event_id=raw.get("event_id", raw.get("tool_call_id", f"ev-{line_num}")),
+        event_id=event_id,
         event_type=event_type,
         timestamp=ts,
         tool_name=tool_name,

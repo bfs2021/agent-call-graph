@@ -35,3 +35,14 @@ def test_generic_parser_malformed_lines():
         f.flush()
         session = parse_generic_jsonl(f.name)
         assert len(session.events) == 1
+
+
+def test_generic_parser_null_event_id_uses_line_default():
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
+        f.write('{"type": "tool_call", "tool_name": "bash", "event_id": null, "timestamp": 1}\n')
+        f.write('{"type": "tool_call", "tool_name": "bash", "event_id": "given", "timestamp": 1}\n')
+        f.flush()
+        session = parse_generic_jsonl(f.name)
+
+    assert [event.event_id for event in session.events] == ["ev-1", "given"]
